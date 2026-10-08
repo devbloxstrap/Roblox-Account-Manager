@@ -110,5 +110,32 @@ Test("Current-user encrypted profile database roundtrip", () =>
         if (priorBackup == null) File.Delete(backup); else File.WriteAllBytes(backup, priorBackup);
     }
 });
+Test("Isolated encrypted account authentication storage", () =>
+{
+    var accountId = Guid.NewGuid();
+    const string testLogin = "_|WARNING:-DO-NOT-SHARE-THIS-TEST-IS-NOT-REAL";
+    try
+    {
+        AccountAuthStore.Save(accountId, testLogin);
+        Check(AccountAuthStore.HasLogin(accountId), "No encrypted login after Save");
+        Check(AccountAuthStore.Load(accountId) == testLogin, "DPAPI login roundtrip mismatch");
+    }
+    finally { AccountAuthStore.Delete(accountId); }
+    Check(!AccountAuthStore.HasLogin(accountId), "Account login not deleted");
+    Throws<FileNotFoundException>(() => AccountAuthStore.Load(accountId));
+    Throws<ArgumentException>(() => AccountAuthStore.Save(Guid.Empty, testLogin));
+});
+Test("Fresh ticket handoff URI guards and correct game targeting", () =>
+{
+    string game = RobloxTicketLauncher.BuildLaunchUri("nonsecret-test-ticket", 123456, null, 1234567, 1234);
+    Check(game.StartsWith("roblox-player:1+launchmode:play+gameinfo:nonsecret-test-ticket"), "Ticket URI prefix");
+    Check(game.Contains("placelauncherurl:"), "Game URL missing");
+    Check(game.Contains("RequestGame"), "Game launch mode missing");
+    string jobId = Guid.NewGuid().ToString("D");
+    string server = RobloxTicketLauncher.BuildLaunchUri("test-ticket", 123456, jobId, 1234567, 1234);
+    Check(server.Contains("RequestGameJob") && server.Contains(jobId), "Specific server identifier not included");
+    Throws<ArgumentOutOfRangeException>(() => RobloxTicketLauncher.BuildLaunchUri("test", 0, null, 123, 1));
+    Throws<ArgumentException>(() => RobloxTicketLauncher.BuildLaunchUri("test", 1, "NOT-A-GUID", 123, 1));
+});
 Console.WriteLine($"RESULT: {success} PASS, {failures} FAIL");
 return failures == 0 ? 0 : 1;

@@ -97,12 +97,14 @@
                                 <TextBlock Text="Selected server" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
                                 <TextBlock x:Name="ServerDetailsText" Text="Select a server to see details." Foreground="#A5C1E2" Margin="0,0,0,20"/>
                                 <CheckBox x:Name="ShuffleOnJoinCheck" Content="Shuffle Job ID when joining" Foreground="#CDE5FF" Margin="0,0,0,12"/>
-                                <Button Content="Join selected server" Click="JoinServer_Click"/>
+                                <TextBlock Text="Launch as account" Margin="0,4,0,4"/>
+                                <ComboBox x:Name="ServerAccountBox" DisplayMemberPath="Handle" Margin="0,0,0,10"/>
+                                <Button Content="Join selected server as account" Click="JoinServer_Click"/>
                                 <Button Content="Open game's page" Click="OpenServerGame_Click" Style="{StaticResource Secondary}"/>
                                 <Button Content="Favorite this game" Click="FavoriteServerGame_Click" Style="{StaticResource Secondary}"/>
                             </StackPanel>
                         </Grid>
-                        <TextBlock Grid.Row="3" Text="Server list is a read-only public API. It can be rate-limited or have restricted pagination. Join uses the official Roblox deep-link handler." Foreground="#8FAECD" Margin="0,12,0,0"/>
+                        <TextBlock Grid.Row="3" Text="Server list is a read-only public API. It can be rate-limited or have restricted pagination. Join requests a new login ticket for the chosen saved account." Foreground="#8FAECD" Margin="0,12,0,0"/>
                     </Grid>
                 </Border>
             </TabItem>
@@ -215,11 +217,13 @@
                             <TextBox x:Name="ShufflePlaceBox" Width="180" ToolTip="Roblox Place ID"/>
                             <TextBox x:Name="ShuffleMaxPlayersBox" Width="160" Text="" ToolTip="Optional maximum current players (leave blank for any non-full server)"/>
                             <Button Content="Shuffle public server" Click="ShuffleServer_Click"/>
-                            <Button Content="Open selected server" Click="JoinShuffled_Click" Style="{StaticResource Secondary}"/>
+                            <Button Content="Join shuffled server as account" Click="JoinShuffled_Click" Style="{StaticResource Secondary}"/>
                         </WrapPanel>
+                        <TextBlock Text="Account for shuffled server" Margin="0,9,0,5"/>
+                        <ComboBox x:Name="ShuffleAccountBox" DisplayMemberPath="Handle" Width="260" HorizontalAlignment="Left" Margin="0,0,0,8"/>
                         <TextBlock x:Name="ShuffleResultText" Text="No server selected." FontSize="15" TextWrapping="Wrap" Foreground="#CFE5FF" Margin="0,8,0,14"/>
                         <Button Content="Copy selected Job ID" Click="CopyShuffled_Click" HorizontalAlignment="Left" Style="{StaticResource Secondary}"/>
-                        <TextBlock Text="Roblox deep-link support and server availability can change. If the client rejects a link, use the official game page." Foreground="#9DBAD9" Margin="0,20,0,0"/>
+                        <TextBlock Text="A fresh ticket is requested for the account selected above. Roblox determines whether the game/server join succeeds." Foreground="#9DBAD9" Margin="0,20,0,0"/>
                     </StackPanel>
                 </Border>
             </TabItem>
@@ -244,14 +248,14 @@
                         <TextBlock Text="Session Health, Passwords &amp; Verification" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
                         <TextBlock Text="RAM never records typed Roblox passwords. Use Edge's built-in password manager inside each account's isolated browser profile." Foreground="#B6D1F0" Margin="0,0,0,16"/>
                         <WrapPanel>
-                            <Button Content="Audit local session snapshots" Click="AuditSessions_Click"/>
+                            <Button Content="Audit encrypted account logins" Click="AuditSessions_Click"/>
                             <Button Content="Verify current desktop session" Click="HealthCheck_Click" Style="{StaticResource Secondary}"/>
                         </WrapPanel>
-                        <TextBlock x:Name="HealthResultText" Text="Session snapshots are encrypted locally. A snapshot does not guarantee an active login." Foreground="#D7E9FF" Margin="0,4,0,15"/>
+                        <TextBlock x:Name="HealthResultText" Text="Account logins are encrypted locally. Verify them individually before launching." Foreground="#D7E9FF" Margin="0,4,0,15"/>
                         <TextBlock Text="Choose account for secure browser login" FontWeight="SemiBold" Margin="0,0,0,10"/>
                         <WrapPanel>
                             <ComboBox x:Name="SessionAccountBox" DisplayMemberPath="Username" Width="225" Margin="0,0,12,12"/>
-                            <Button Content="Official Roblox login (isolated)" Click="OpenSafeLogin_Click"/>
+                            <Button Content="Separate Edge login (manual, not captured)" Click="OpenSafeLogin_Click"/>
                             <Button Content="Manage Edge passwords" Click="ManageBrowserPasswords_Click" Style="{StaticResource Secondary}"/>
                         </WrapPanel>
                         <TextBlock Text="CAPTCHA and 2FA are completed directly on the official Roblox login page. Automatic cookie/token refreshing, CAPTCHA bypass and password interception are not supported." Foreground="#A9C7E8" Margin="0,12,0,0"/>

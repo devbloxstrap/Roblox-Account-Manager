@@ -30,6 +30,32 @@ for file in ['RAM.Modern.SmokeTests/Program.cs','RAM.Modern/Services/PublicFeatu
     if not (root/file).exists(): errors.append(f'Missing {file}')
 
 if 'auto-update' in (root/'RAM.Modern/Services/PublicFeatureTools.cs').read_text(encoding='utf-8').lower():errors.append('Forbidden updater reference')
+# Catch common missing System.IO imports before the Windows compiler starts.
+io_re = re.compile(r'\b(?:File|Directory|Path)\s*\.|\b(?:InvalidDataException|FileNotFoundException|FileStream|IOException)\b')
+for csfile in sorted((root/'RAM.Modern').rglob('*.cs')) + sorted((root/'RAM.Modern.SmokeTests').rglob('*.cs')):
+    code = csfile.read_text(encoding='utf-8')
+    if io_re.search(code) and 'using System.IO;' not in code and 'global using System.IO;' not in code:
+        errors.append(f'{csfile.relative_to(root)}: missing using System.IO;')
+if not any('missing using System.IO' in issue for issue in errors):
+    print('PASS System.IO namespace preflight across C# files')
+
+# Preview 7 regression: keep one game-launch handler, never reintroduce local-file restore
+# in the primary account switching path.
+main = (ui/'MainWindow.xaml.cs').read_text(encoding='utf-8')
+if main.count('private async void RestoreAndLaunch_Click(') != 1:
+    errors.append('MainWindow: duplicate/missing selected-account launch handler')
+if 'RestoreVerifiedAsync(' in main:
+    errors.append('MainWindow: old snapshot-restore path still referenced')
+for newfile in ['BrowserLoginWindow.cs', 'Services/BrowserLoginCapture.cs',
+                'Services/AccountAuthStore.cs', 'Services/RobloxTicketLauncher.cs']:
+    if not (ui/newfile).exists(): errors.append('Missing ticket-login module: '+newfile)
+if 'AccountAuthStore.Save(' not in main or 'RobloxTicketLauncher.LaunchAsync(' not in main:
+    errors.append('MainWindow: new per-account login/launch workflow missing')
+if not any('RobloxTicketLauncher.LaunchAsync(' in f.read_text(encoding='utf-8')
+           for f in [ui/'ToolsWindow.xaml.cs',ui/'AdvancedWindow.xaml.cs']):
+    errors.append('Account-specific server launch not wired')
+if not errors:print('PASS Preview 7 account ticket/source regression checks')
+
 print('RESULT:', 'PASS' if not errors else 'FAILED')
 for item in errors:print('ERROR:',item)
 sys.exit(0 if not errors else 1)

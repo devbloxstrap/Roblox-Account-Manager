@@ -1,20 +1,26 @@
-# RAM Modern 4.0 - Consolidated Preview 6
+# RAM 4.0 — Preview 7 (Independent account login + ticket-based game launches)
 
-A modern Windows 10/11 Roblox account/game manager using C# / WPF / .NET 10. This is an independent user-facing application maintained separately from the legacy RAM code.
+This folder contains the modern Windows WPF client for Roblox Account Manager. It retains the previous advanced UI and tools, and replaces legacy RobloxCookies.dat switching with an **independent per-account official-browser login** and fresh Roblox authentication-ticket handoff.
 
-## Quick start
+## How to build
 
-1. Place `RAM.Modern`, `RAM.Modern.SmokeTests` and `.github/workflows` at the repository root.
-2. Commit to `main`; GitHub Actions runs the .NET 10 smoke harness, compiles and publishes `RAM.Modern.exe`.
-3. Download the `RAM-Modern-win-x64` build artifact and start `RAM.Modern.exe`.
-4. Follow **ONE_PASS_TESTING.md** for the single Windows acceptance test.
+GitHub Actions: `.github/workflows/ram-modern-windows.yml`; or with the .NET 10 Windows SDK:
 
-## Included
+```powershell
+dotnet restore RAM.Modern.SmokeTests/RAM.Modern.SmokeTests.csproj
+dotnet run --project RAM.Modern.SmokeTests/RAM.Modern.SmokeTests.csproj -c Release
+dotnet publish RAM.Modern/RAM.Modern.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+```
 
-Account profiles, encrypted local storage and metadata backups, identity-checked saved-session workflow (experimental), Roblox desktop launcher, multi-page public server browser and low-player scan, real Job ID shuffle, private server links, public player lookup, favorites/recents, game discovery, outfits and universe viewer, isolated Edge profiles/password manager, FPS presets and backup, theme presets, local developer API, watcher, safe diagnostics and a Windows smoke-test workflow.
+## Correct workflow
+1. **Add account via browser**, sign in on official Roblox.com in a new Edge/Chrome window and click **Capture my signed-in account**. RAM never asks for a password.
+2. Repeat for additional accounts without logging out previous accounts.
+3. **Verify saved account login** on each profile.
+4. Enter a valid Place ID, close any running Roblox Player, select a profile and press **Launch selected account game**. A fresh Roblox authentication ticket is requested *for that profile*.
+5. The returned URI is merely an OS handoff; inspect the actual Roblox window to verify game login.
 
-## Limits
+See [ONE_PASS_TESTING.md](ONE_PASS_TESTING.md) and [FEATURE_STATUS.md](FEATURE_STATUS.md) for precise limitations and the unified testing checklist.
 
-The app does **not** bypass Roblox login security or automate CAPTCHA solving; an encrypted session snapshot is not a guarantee the official Roblox desktop client will authenticate with it. Browser sessions and desktop sessions are separate. Client compatibility needs actual Windows testing. See **FEATURE_STATUS.md**.
+**Security:** Treat session secrets as passwords. Windows DPAPI ties them to the current Windows login; they are never included in metadata export. Closing temporary browser profiles is best-effort. Do not share debugging logs containing authentication links.
 
-Excluded by request: auto updater and multi-instance launching.
+Auto-updater and multi-instance launching remain intentionally excluded.

@@ -260,11 +260,11 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <Image Source="Assets/header-logo.png" Height="84" Stretch="Uniform" HorizontalAlignment="Left" Margin="0,0,0,14"/>
-                            <TextBlock Text="Professional account profiles, encrypted session snapshots, and a modern Windows desktop experience." FontSize="15" Foreground="#D8E5FF" Margin="0,0,0,8"/>
+                            <TextBlock Text="Independent account logins, encrypted per-account sessions, and Roblox ticket-based game launching." FontSize="15" Foreground="#D8E5FF" Margin="0,0,0,8"/>
                             <TextBlock Text="Resizable • Maximizable • Local profile storage • Windows 10 / 11" FontSize="12.5" Foreground="#90B3DE"/>
                         </StackPanel>
                         <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="20,0,0,0">
-                            <Button Content="Open Roblox desktop" Click="Login_Click"/>
+                            <Button Content="Open Roblox desktop (manual login)" Click="Login_Click"/>
                             <Button Content="Roblox home" Click="Home_Click"/>
                             <Button Content="Game explorer &amp; tools" Click="OpenTools_Click"/>
                             <Button Content="Advanced controls" Click="AdvancedSettings_Click" Style="{StaticResource SecondaryButtonStyle}"/>
@@ -323,7 +323,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="Saved accounts" FontSize="19" FontWeight="Bold"/>
-                                    <TextBlock Text="Select a profile to edit details, save a session, or restore a stored session." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,0"/>
+                                    <TextBlock Text="Select an account, verify its saved login, or launch a game using its account-specific ticket." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,0"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="New profile" Click="New_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="16,0,0,0" VerticalAlignment="Top"/>
                             </Grid>
@@ -369,7 +369,7 @@
                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30">
                                         <TextBlock Text="🗂" FontSize="46" HorizontalAlignment="Center"/>
                                         <TextBlock Text="No profiles yet" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,12,0,6"/>
-                                        <TextBlock Text="Create a new profile, then save the current Roblox session after logging in with that account." FontSize="13" Foreground="#A4BEDF" TextAlignment="Center" MaxWidth="360"/>
+                                        <TextBlock Text="Click Add account via browser to log in on Roblox.com. Accounts are added automatically after verification." FontSize="13" Foreground="#A4BEDF" TextAlignment="Center" MaxWidth="360"/>
                                         <Button Content="Create first profile" Click="New_Click" HorizontalAlignment="Center" Margin="0,18,0,0"/>
                                     </StackPanel>
                                 </Border>
@@ -384,7 +384,7 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Profile details" FontSize="19" FontWeight="Bold"/>
-                                <TextBlock Text="Manage account metadata, session snapshots, and quick Roblox actions." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,18"/>
+                                <TextBlock Text="Manage account metadata, independent account logins, and quick Roblox actions." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,18"/>
 
                                 <Border Background="#132442" BorderBrush="#365B8E" BorderThickness="1" CornerRadius="16" Padding="14" Margin="0,0,0,18">
                                     <Grid>
@@ -428,15 +428,15 @@
 
                                 <Border Background="#101D32" BorderBrush="#2F4568" BorderThickness="1" CornerRadius="18" Padding="16" Margin="0,4,0,16">
                                     <StackPanel>
-                                        <TextBlock Text="Session management" FontSize="16" FontWeight="Bold"/>
-                                        <TextBlock Text="Save or restore encrypted Windows-user-specific snapshots of the local Roblox client session file." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
+                                        <TextBlock Text="Account-specific login &amp; game launch" FontSize="16" FontWeight="Bold"/>
+                                        <TextBlock Text="Each Roblox account logs in through its OWN official browser window. Its verified session is encrypted locally. Switching launches the selected game with a fresh ticket." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
                                         <WrapPanel>
-                                            <Button Content="Verify client login" Click="VerifyClient_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                                            <Button Content="Save verified session" Click="SaveSession_Click"/>
-                                            <Button Content="Restore selected session" Click="RestoreSession_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                                            <Button Content="Restore + launch desktop" Click="RestoreAndLaunch_Click"/>
+                                            <Button Content="Verify desktop login (legacy)" Click="VerifyClient_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Add account via browser" Click="SaveSession_Click"/>
+                                            <Button Content="Verify saved account login" Click="RestoreSession_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Launch selected account game" Click="RestoreAndLaunch_Click"/>
                                         </WrapPanel>
-                                        <TextBlock Text="Important: close Roblox Player and Roblox Studio completely before saving or restoring. A restored session can still be expired or rejected by Roblox." FontSize="11.5" Foreground="#8FB0DA" Margin="0,6,0,0"/>
+                                        <TextBlock Text="Add a second account without logging out of the first. Set a Place ID to launch. Close Roblox Player before another launch (multi-instance disabled). Login tickets may be rejected by Roblox." FontSize="11.5" Foreground="#8FB0DA" Margin="0,6,0,0"/>
                                     </StackPanel>
                                 </Border>
 
@@ -451,12 +451,12 @@
                                         </WrapPanel>
                                         <TextBlock Text="Place ID" Style="{StaticResource LabelTextStyle}"/>
                                         <TextBox x:Name="PlaceBox" ToolTip="Enter a Roblox place ID to open it" Margin="0,0,0,6"/>
-                                        <Button Content="Open game in Roblox" HorizontalAlignment="Left" Click="Game_Click"/>
+                                        <Button Content="Open game webpage" HorizontalAlignment="Left" Click="Game_Click"/>
                                         <TextBlock Text="Favorite game / account-specific Place ID" Style="{StaticResource LabelTextStyle}" Margin="0,13,0,6"/>
                                         <TextBox x:Name="PreferredPlaceBox" ToolTip="Account's saved preferred Place ID"/>
                                         <TextBlock Text="Preferred Job ID (optional)" Style="{StaticResource LabelTextStyle}"/>
                                         <TextBox x:Name="PreferredJobBox" ToolTip="Optional server Job ID"/>
-                                        <Button Content="Launch preferred game" Click="OpenPreferred_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                        <Button Content="Launch preferred game as selected account" Click="OpenPreferred_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -466,7 +466,7 @@
             </Grid>
 
             <Border Grid.Row="2" Margin="22,0,22,22" Background="#0D1728" BorderBrush="#274367" BorderThickness="1" CornerRadius="14" Padding="14,10">
-                <TextBlock x:Name="StatusText" Foreground="#D7E5F9" Text="Ready. Saved sessions are encrypted for the current Windows user. Roblox may still require re-login."/>
+                <TextBlock x:Name="StatusText" Foreground="#D7E5F9" Text="Add separate Roblox accounts via official login, then launch a selected game using a fresh ticket."/>
             </Border>
         </Grid>
     </Border>

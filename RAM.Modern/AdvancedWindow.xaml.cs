@@ -217,14 +217,15 @@ public partial class AdvancedWindow : Window
 
     private void OpenRoblox_Click(object sender, RoutedEventArgs e) => Run(() => ControlsStatusText.Text = RobloxService.LaunchDesktop(), "Roblox launch");
 
-    private void OpenPreferred_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void OpenPreferred_Click(object sender, RoutedEventArgs e)
     {
-        var p = _selectedProfile() ?? throw new InvalidOperationException("Select a profile in the main window first.");
-        if (p.PreferredPlaceId <= 0) throw new InvalidOperationException("Selected profile has no preferred game Place ID.");
-        if (!string.IsNullOrWhiteSpace(p.PreferredJobId)) RobloxService.OpenServer(p.PreferredPlaceId, p.PreferredJobId);
-        else RobloxService.OpenGame(p.PreferredPlaceId);
-        ControlsStatusText.Text = $"Requested preferred game {p.PreferredPlaceId}. Check Roblox client authentication.";
-    }, "Preferred game");
+        try
+        {
+            var p = _selectedProfile() ?? throw new InvalidOperationException("Select an account in the main window first.");
+            ControlsStatusText.Text = await RobloxTicketLauncher.LaunchAsync(p, p.PreferredPlaceId, p.PreferredJobId);
+        }
+        catch (Exception ex) { ControlsStatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Preferred game", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
 
     private void CloseRoblox_Click(object sender, RoutedEventArgs e) => Run(() =>
     {

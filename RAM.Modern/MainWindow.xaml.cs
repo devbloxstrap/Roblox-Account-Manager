@@ -96,8 +96,8 @@ public partial class MainWindow : Window
         UpdateSelectionSummary(selected);
 
         StatusText.Text = _profiles.Count == 0
-            ? "Ready. Create your first profile to begin. Session snapshots are encrypted for the current Windows user."
-            : $"Ready. {_profiles.Count} profile{(_profiles.Count == 1 ? string.Empty : "s")} available. Saved sessions are encrypted for the current Windows user.";
+            ? "Ready. Create your first profile to begin. Account logins can be added independently via the official browser."
+            : $"Ready. {_profiles.Count} profile{(_profiles.Count == 1 ? string.Empty : "s")} available. Account logins are stored encrypted for this Windows user.";
     }
 
     private void UpdateSelectionSummary(AccountProfile? p)
@@ -113,12 +113,12 @@ public partial class MainWindow : Window
         var title = string.IsNullOrWhiteSpace(p.DisplayName) ? p.Username : p.DisplayName;
         SelectedTitleText.Text = string.IsNullOrWhiteSpace(title) ? "Selected profile" : title;
         SelectedSubtitleText.Text = $"@{p.Username}" + (p.UserId > 0 ? $" • ID {p.UserId}" : string.Empty) + $" • Group: {p.Group}";
-        SetSessionBadge(SessionSwitcher.HasSnapshot(p.Id));
+        SetSessionBadge(AccountAuthStore.HasLogin(p.Id));
     }
 
     private void SetSessionBadge(bool hasSession)
     {
-        SessionStateText.Text = hasSession ? "Saved session available" : "No saved session";
+        SessionStateText.Text = hasSession ? "Encrypted account login saved" : "Add login via browser";
         SessionStateBadge.Background = hasSession ? new SolidColorBrush(Color.FromRgb(22, 59, 54)) : new SolidColorBrush(Color.FromRgb(24, 50, 87));
         SessionStateBadge.BorderBrush = hasSession ? new SolidColorBrush(Color.FromRgb(84, 209, 176)) : new SolidColorBrush(Color.FromRgb(74, 122, 188));
     }
@@ -287,6 +287,7 @@ public partial class MainWindow : Window
         try
         {
             ProfileStore.Save(_profiles);
+            AccountAuthStore.Delete(p.Id);
             SessionSwitcher.Delete(p.Id);
             ClearEditor();
             _selectedId = null;
@@ -337,71 +338,78 @@ public partial class MainWindow : Window
     private async void SaveSession_Click(object sender, RoutedEventArgs e)
     {
         if (_sessionBusy) return;
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
-        if (p is null) { MessageBox.Show("Select and save an account profile first."); return; }
         _sessionBusy = true;
         try
         {
-            StatusText.Text = $"Verifying desktop session before saving @{p.Username}…";
-            var actual = await RobloxSessionIdentity.CheckCurrentAsync();
-            if (actual is null)
-                throw new InvalidOperationException("No verifiable Roblox desktop login found. Sign in through Roblox desktop (not Chrome), close all Roblox windows, then retry.");
-            if (!p.Username.Equals(actual.Name, StringComparison.OrdinalIgnoreCase) || (p.UserId > 0 && actual.Id != p.UserId))
-                throw new InvalidOperationException($"Wrong account. Selected @{p.Username} but desktop Roblox is @{actual.Name} (ID {actual.Id}). No session saved.");
-            if (MessageBox.Show($"Roblox confirmed @{actual.Name} (ID {actual.Id}). Save this session encrypted for the current Windows user?",
-                    "Verified account", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            SessionSwitcher.SaveCurrent(p.Id);
-            p.UserId = actual.Id;
-            p.DisplayName = string.IsNullOrWhiteSpace(p.DisplayName) ? actual.DisplayName : p.DisplayName;
-            ProfileStore.Save(_profiles);
-            SetSessionBadge(true);
+            var login = new BrowserLoginWindow { Owner = this };
+            if (login.ShowDialog() != true || login.CapturedUser is null || login.CapturedCookie is null) return;
+            var actual = login.CapturedUser;
+            // Every captured identity maps to ONE unique profile. Never bind the wrong login to a selected profile.
+            var profile = _profiles.FirstOrDefault(p => p.UserId > 0 && p.UserId == actual.Id)
+                ?? _profiles.FirstOrDefault(p => p.Username.Equals(actual.Name, StringComparison.OrdinalIgnoreCase));
+            bool created = profile == null;
+            profile ??= new AccountProfile { Username = actual.Name, UserId = actual.Id, Group = "General" };
+            if (profile.UserId > 0 && profile.UserId != actual.Id)
+                throw new InvalidOperationException("Existing profile has the same username but a different Roblox user ID. No login saved.");
+            profile.Username = actual.Name;
+            profile.UserId = actual.Id;
+            if (string.IsNullOrWhiteSpace(profile.DisplayName)) profile.DisplayName = actual.DisplayName;
+            // Persist metadata first. A failed profile save must not create orphaned sessions.
+            if (created) _profiles.Add(profile);
+            try { ProfileStore.Save(_profiles); }
+            catch { if (created) _profiles.Remove(profile); throw; }
+            AccountAuthStore.Save(profile.Id, login.CapturedCookie);
+            _selectedId = profile.Id;
             Refresh();
-            StatusText.Text = $"Verified and saved an encrypted session for @{actual.Name}.";
-            MessageBox.Show($"Session saved for @{actual.Name}. The account was verified by Roblox.",
-                "Saved successfully", MessageBoxButton.OK, MessageBoxImage.Information);
+            AccountsList.SelectedItem = _displayed.FirstOrDefault(p => p.Id == profile.Id);
+            StatusText.Text = $"Encrypted browser login saved for @{actual.Name} (ID {actual.Id}).";
+            MessageBox.Show(this,
+                $"Account @{actual.Name} added. You can now add your next Roblox account using a NEW login browser. Do not log out of this one.",
+                "Account saved", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Save session failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Account login", MessageBoxButton.OK, MessageBoxImage.Warning); }
         finally { _sessionBusy = false; }
-    }
-
-    private async Task<bool> RestoreVerifiedAsync(AccountProfile p)
-    {
-        if (MessageBox.Show($"Restore saved local session for @{p.Username}? Close Roblox Player and Studio first.",
-                "Restore session", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return false;
-        if (!SessionSwitcher.Restore(p.Id)) throw new IOException("Local restore verification failed; file was not restored correctly.");
-        StatusText.Text = "Local session restored. Checking with Roblox…";
-        var actual = await RobloxSessionIdentity.CheckCurrentAsync();
-        if (actual is null)
-        {
-            StatusText.Text = "Local file restored, but Roblox login was NOT verified. The session may have expired.";
-            MessageBox.Show("The local file was restored, but Roblox did not verify the login. The session may be expired, revoked, or unsupported. Re-login in the official desktop client.",
-                "Session not verified", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-        if (!actual.Name.Equals(p.Username, StringComparison.OrdinalIgnoreCase) || (p.UserId > 0 && p.UserId != actual.Id))
-        {
-            StatusText.Text = "Restored file belongs to a different Roblox account. Do not launch it as the selected profile.";
-            MessageBox.Show($"Account mismatch! Selected @{p.Username}, but Roblox says @{actual.Name}. Login was not accepted for the selected profile.",
-                "Account mismatch", MessageBoxButton.OK, MessageBoxImage.Error);
-            return false;
-        }
-        p.LastSelectedUtc = DateTimeOffset.UtcNow;
-        ProfileStore.Save(_profiles);
-        UpdateSelectionSummary(p);
-        StatusText.Text = $"Roblox API validated session for @{actual.Name}. Desktop application still needs a launch test.";
-        MessageBox.Show($"Roblox API verified @{actual.Name} (ID {actual.Id}). You can now launch the Roblox desktop client.",
-            "Session verified", MessageBoxButton.OK, MessageBoxImage.Information);
-        return true;
     }
 
     private async void RestoreSession_Click(object sender, RoutedEventArgs e)
     {
         if (_sessionBusy) return;
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
-        if (p is null) { MessageBox.Show("Select a profile first."); return; }
+        var profile = _profiles.FirstOrDefault(p => p.Id == _selectedId);
+        if (profile is null) { MessageBox.Show("Select an account first."); return; }
         _sessionBusy = true;
-        try { await RestoreVerifiedAsync(p); }
-        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Restore failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        try
+        {
+            StatusText.Text = "Checking the selected account's saved login…";
+            var actual = await RobloxTicketLauncher.VerifySavedAsync(profile);
+            StatusText.Text = $"Roblox verified saved account @{actual.Name} (ID {actual.Id}).";
+            MessageBox.Show(this, StatusText.Text, "Saved login verified", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Login check", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
+
+    private async Task LaunchSelectedGameAsync(bool preferredOnly)
+    {
+        var profile = _profiles.FirstOrDefault(p => p.Id == _selectedId)
+            ?? throw new InvalidOperationException("Select an account first.");
+        long place = profile.PreferredPlaceId;
+        if (!preferredOnly && long.TryParse(PlaceBox.Text, out long entered) && entered > 0) place = entered;
+        if (place <= 0) throw new InvalidOperationException("Enter a game Place ID (or save your preferred Place ID) first.");
+        string? jobId = !string.IsNullOrWhiteSpace(profile.PreferredJobId) && place == profile.PreferredPlaceId
+            ? profile.PreferredJobId : null;
+        StatusText.Text = $"Requesting a fresh Roblox authentication ticket for @{profile.Username}…";
+        StatusText.Text = await RobloxTicketLauncher.LaunchAsync(profile, place, jobId);
+        profile.LastSelectedUtc = DateTimeOffset.UtcNow;
+        ProfileStore.Save(_profiles);
+        GameLibraryStore.AddRecent(GameLibraryStore.Load(), place);
+    }
+
+    private async void RestoreAndLaunch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sessionBusy) return;
+        _sessionBusy = true;
+        try { await LaunchSelectedGameAsync(preferredOnly: false); }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Selected account launch", MessageBoxButton.OK, MessageBoxImage.Warning); }
         finally { _sessionBusy = false; }
     }
 
@@ -413,21 +421,6 @@ public partial class MainWindow : Window
         StatusText.Text = $"Launched a separate Edge profile for @{p.Username}. Sign in in that browser once; it is not the Roblox desktop login.";
     });
     private void BrowserLogin_Click(object sender, RoutedEventArgs e) => Safe(RobloxService.BrowserLogin);
-    private async void RestoreAndLaunch_Click(object sender, RoutedEventArgs e)
-    {
-        if (_sessionBusy) return;
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
-        if (p is null) { MessageBox.Show("Select a profile first."); return; }
-        _sessionBusy = true;
-        try
-        {
-            if (!await RestoreVerifiedAsync(p)) return;
-            StatusText.Text = RobloxService.LaunchDesktop();
-        }
-        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Restore / launch failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        finally { _sessionBusy = false; }
-    }
-
     private async void Lookup_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -467,16 +460,14 @@ public partial class MainWindow : Window
         Refresh();
     });
 
-    private void OpenPreferred_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    private async void OpenPreferred_Click(object sender, RoutedEventArgs e)
     {
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId) ?? throw new InvalidOperationException("Select a saved profile.");
-        if (p.PreferredPlaceId <= 0) throw new InvalidOperationException("Save the profile with its preferred Place ID first.");
-        if (!string.IsNullOrWhiteSpace(p.PreferredJobId)) RobloxService.OpenServer(p.PreferredPlaceId, p.PreferredJobId);
-        else RobloxService.OpenGame(p.PreferredPlaceId);
-        var data = GameLibraryStore.Load();
-        GameLibraryStore.AddRecent(data, p.PreferredPlaceId);
-        StatusText.Text = $"Opened preferred game {p.PreferredPlaceId} for profile @{p.Username}; client authentication is not guaranteed.";
-    });
+        if (_sessionBusy) return;
+        _sessionBusy = true;
+        try { await LaunchSelectedGameAsync(preferredOnly: true); }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Preferred game launch", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
 
     private void Home_Click(object sender, RoutedEventArgs e) => Safe(RobloxService.Home);
 

@@ -41,7 +41,7 @@ public static class SessionInventory
     {
         int yes = 0, no = 0;
         foreach (var profile in profiles)
-            if (SessionSwitcher.HasSnapshot(profile.Id)) yes++; else no++;
+            if (AccountAuthStore.HasLogin(profile.Id)) yes++; else no++;
         return (yes, no);
     }
 }

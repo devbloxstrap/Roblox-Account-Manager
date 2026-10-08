@@ -17,8 +17,8 @@ public static class DiagnosticsReport
         sb.AppendLine("Runtime: " + RuntimeInformation.FrameworkDescription);
         sb.AppendLine("Profiles: " + profiles.Count);
         var sessions = SessionInventory.Count(profiles);
-        sb.AppendLine($"Local encrypted snapshot files: {sessions.WithSnapshot}; no snapshot: {sessions.WithoutSnapshot}");
-        sb.AppendLine("Important: snapshot file presence does not establish an authenticated session.");
+        sb.AppendLine($"Encrypted per-account logins: {sessions.WithSnapshot}; need login: {sessions.WithoutSnapshot}");
+        sb.AppendLine("Important: encrypted login file presence does not establish a currently valid session.");
         try { sb.AppendLine("Roblox process count: " + RobloxService.RunningPlayerCount()); }
         catch (Exception e) { sb.AppendLine("Roblox process check error: " + e.GetType().Name); }
         try { sb.AppendLine("Roblox desktop binary detected: " + (RobloxService.FindDesktopClient() is not null)); }

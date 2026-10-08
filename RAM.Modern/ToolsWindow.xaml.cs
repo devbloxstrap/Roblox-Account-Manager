@@ -37,6 +37,10 @@ public partial class ToolsWindow : Window
         _profileRefresh = profileRefresh;
         _library = GameLibraryStore.Load();
         ServersList.ItemsSource = _servers;
+        ServerAccountBox.ItemsSource = _profiles.OrderBy(p => p.Username).ToList();
+        ShuffleAccountBox.ItemsSource = _profiles.OrderBy(p => p.Username).ToList();
+        if (_profiles.Count > 0) ServerAccountBox.SelectedIndex = 0;
+        if (_profiles.Count > 0) ShuffleAccountBox.SelectedIndex = 0;
         FavoriteGamesList.ItemsSource = _favorites;
         RecentGamesList.ItemsSource = _recents;
         RecommendedGamesList.ItemsSource = _recommendations;
@@ -142,19 +146,23 @@ public partial class ToolsWindow : Window
         else ServerDetailsText.Text = "Select a server to see details.";
     }
 
-    private void JoinServer_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void JoinServer_Click(object sender, RoutedEventArgs e)
     {
-        GameServer server;
-        if (ShuffleOnJoinCheck.IsChecked == true)
-            server = PublicServerShuffle.Select(_servers, _lastJoinedJobId);
-        else
-            server = ServersList.SelectedItem as GameServer ?? throw new InvalidOperationException("Select a server, or enable shuffle-on-join.");
-        _lastJoinedJobId = server.Id;
-        RobloxService.OpenServer(_currentPlaceId, server.Id);
-        GameLibraryStore.AddRecent(_library, _currentPlaceId);
-        UpdateGames();
-        ToolsStatusText.Text = "Sent server deep-link to Windows. Roblox client decides whether joining succeeds.";
-    });
+        try
+        {
+            GameServer server = ShuffleOnJoinCheck.IsChecked == true
+                ? PublicServerShuffle.Select(_servers, _lastJoinedJobId)
+                : ServersList.SelectedItem as GameServer ?? throw new InvalidOperationException("Select a public server first.");
+            var account = ServerAccountBox.SelectedItem as AccountProfile
+                ?? throw new InvalidOperationException("Select a saved account for the server join.");
+            _lastJoinedJobId = server.Id;
+            ToolsStatusText.Text = "Getting a fresh ticket for @" + account.Username + "…";
+            ToolsStatusText.Text = await RobloxTicketLauncher.LaunchAsync(account, _currentPlaceId, server.Id);
+            GameLibraryStore.AddRecent(_library, _currentPlaceId);
+            UpdateGames();
+        }
+        catch (Exception ex) { ToolsStatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Server join", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
 
     private void OpenServerGame_Click(object sender, RoutedEventArgs e) => Run(() =>
     {
@@ -350,14 +358,19 @@ public partial class ToolsWindow : Window
         finally { _shuffling = false; }
     }
 
-    private void JoinShuffled_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void JoinShuffled_Click(object sender, RoutedEventArgs e)
     {
-        if (_shuffledServer is null || _shuffledPlaceId <= 0) throw new InvalidOperationException("Shuffle a server first.");
-        RobloxService.OpenServer(_shuffledPlaceId, _shuffledServer.Id);
-        GameLibraryStore.AddRecent(_library, _shuffledPlaceId);
-        UpdateGames();
-        ToolsStatusText.Text = "Opened official server deep-link. Roblox must confirm the join.";
-    });
+        try
+        {
+            if (_shuffledServer is null || _shuffledPlaceId <= 0) throw new InvalidOperationException("Shuffle a server first.");
+            var account = ShuffleAccountBox.SelectedItem as AccountProfile
+                ?? throw new InvalidOperationException("Choose an account for the shuffled server first.");
+            ToolsStatusText.Text = await RobloxTicketLauncher.LaunchAsync(account, _shuffledPlaceId, _shuffledServer.Id);
+            GameLibraryStore.AddRecent(_library, _shuffledPlaceId);
+            UpdateGames();
+        }
+        catch (Exception ex) { ToolsStatusText.Text = ex.Message; MessageBox.Show(this, ex.Message, "Shuffled server join", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
 
     private void CopyShuffled_Click(object sender, RoutedEventArgs e) => Run(() =>
     {
@@ -388,8 +401,8 @@ public partial class ToolsWindow : Window
 
     private void AuditSessions_Click(object sender, RoutedEventArgs e)
     {
-        var counts = SessionInventory.Count(_profiles);
-        HealthResultText.Text = $"{counts.WithSnapshot} saved encrypted snapshots • {counts.WithoutSnapshot} profiles without snapshots. Files may be expired; verify the current client separately.";
+        int saved = _profiles.Count(p => AccountAuthStore.HasLogin(p.Id));
+        HealthResultText.Text = $"{saved} encrypted account logins • {_profiles.Count - saved} profiles need browser login. Check each with the Verify saved account login button.";
     }
 
     private async void HealthCheck_Click(object sender, RoutedEventArgs e)
