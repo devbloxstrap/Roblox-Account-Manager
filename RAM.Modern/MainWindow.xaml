@@ -234,11 +234,11 @@
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,8,7">
-                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Minimize_Click" Content="—" ToolTip="Minimize"/>
-                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="MaximizeRestore_Click" ToolTip="Maximize or restore">
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" Content="—" ToolTip="Minimize"/>
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="MaximizeRestore_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize or restore">
                         <TextBlock x:Name="MaximizeGlyph" Text="☐" FontSize="13"/>
                     </Button>
-                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Close_Click" ToolTip="Close">
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close">
                         <TextBlock Text="✕" FontSize="13"/>
                     </Button>
                 </StackPanel>
@@ -264,8 +264,10 @@
                             <TextBlock Text="Resizable • Maximizable • Local profile storage • Windows 10 / 11" FontSize="12.5" Foreground="#90B3DE"/>
                         </StackPanel>
                         <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="20,0,0,0">
-                            <Button Content="Roblox login" Click="Login_Click"/>
+                            <Button Content="Open Roblox desktop" Click="Login_Click"/>
                             <Button Content="Roblox home" Click="Home_Click"/>
+                            <Button Content="Game explorer &amp; tools" Click="OpenTools_Click"/>
+                            <Button Content="Advanced controls" Click="AdvancedSettings_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                             <Button Content="Open data folder" Click="Folder_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </WrapPanel>
                     </Grid>
@@ -282,6 +284,17 @@
                         <TextBox x:Name="SearchBox" Width="340" TextChanged="Search_Changed" ToolTip="Search by username, display name, group, note, or user ID" Margin="0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                        <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,7">
+                            <TextBlock Text="Sort accounts:" Foreground="#ACC8EA" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox x:Name="SortBox" Width="150" SelectedIndex="0" SelectionChanged="Sort_Changed" Foreground="#0B1325" Padding="6">
+                                <ComboBoxItem Content="Favorites / Group"/>
+                                <ComboBoxItem Content="Recently used"/>
+                                <ComboBoxItem Content="Username"/>
+                                <ComboBoxItem Content="Manual order"/>
+                            </ComboBox>
+                            <Button Content="↑" Click="MoveUp_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="10,5" Margin="7,0,0,0" ToolTip="Move selected profile up (manual sort)"/>
+                            <Button Content="↓" Click="MoveDown_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="10,5" Margin="4,0,0,0" ToolTip="Move selected profile down (manual sort)"/>
+                        </WrapPanel>
                         <Border Background="#16284A" BorderBrush="#3A659B" BorderThickness="1" CornerRadius="14" Padding="14,10">
                             <TextBlock x:Name="TopSummaryText" Text="0 profiles stored locally" Foreground="#D8E7FF" FontWeight="SemiBold"/>
                         </Border>
@@ -325,7 +338,8 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Border Width="54" Height="54" CornerRadius="14" Background="#20406E" BorderBrush="#5D93D8" BorderThickness="1" Margin="14,14,12,14">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="👤" FontSize="24"/>
+                                                    <Grid ClipToBounds="True"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="👤" FontSize="24"/>
+                                                        <Image Source="{Binding AvatarUrl}" Stretch="UniformToFill"/></Grid>
                                                 </Border>
                                                 <StackPanel Grid.Column="1" Margin="0,14,8,14">
                                                     <StackPanel Orientation="Horizontal">
@@ -335,7 +349,7 @@
                                                     <TextBlock Text="{Binding Handle}" FontSize="12.5" Foreground="#A6C1E5" Margin="0,4,0,0"/>
                                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                         <Border Background="#12284A" BorderBrush="#365B8E" BorderThickness="1" CornerRadius="10" Padding="8,3" Margin="0,0,8,0">
-                                                            <TextBlock Text="{Binding Group}" FontSize="11.5" Foreground="#D6E8FF"/>
+                                                            <TextBlock Text="{Binding GroupDisplay}" FontSize="11.5" Foreground="#D6E8FF"/>
                                                         </Border>
                                                         <Border Background="#1D3154" BorderBrush="#477AB8" BorderThickness="1" CornerRadius="10" Padding="8,3">
                                                             <TextBlock Text="{Binding UserIdLabel}" FontSize="11.5" Foreground="#D6E8FF"/>
@@ -407,6 +421,7 @@
 
                                 <WrapPanel Margin="0,0,0,14">
                                     <Button Content="Save profile" Click="Save_Click"/>
+                                    <Button Content="Lookup on Roblox" Click="Lookup_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Content="New" Click="New_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Content="Delete" Click="Delete_Click" Style="{StaticResource DangerButtonStyle}"/>
                                 </WrapPanel>
@@ -416,8 +431,10 @@
                                         <TextBlock Text="Session management" FontSize="16" FontWeight="Bold"/>
                                         <TextBlock Text="Save or restore encrypted Windows-user-specific snapshots of the local Roblox client session file." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
                                         <WrapPanel>
-                                            <Button Content="Save current session" Click="SaveSession_Click"/>
+                                            <Button Content="Verify client login" Click="VerifyClient_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Save verified session" Click="SaveSession_Click"/>
                                             <Button Content="Restore selected session" Click="RestoreSession_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Restore + launch desktop" Click="RestoreAndLaunch_Click"/>
                                         </WrapPanel>
                                         <TextBlock Text="Important: close Roblox Player and Roblox Studio completely before saving or restoring. A restored session can still be expired or rejected by Roblox." FontSize="11.5" Foreground="#8FB0DA" Margin="0,6,0,0"/>
                                     </StackPanel>
@@ -429,11 +446,17 @@
                                         <TextBlock Text="Open the selected profile or launch a game through the official Roblox website flow." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
                                         <WrapPanel>
                                             <Button Content="View Roblox profile" Click="Profile_Click"/>
-                                            <Button Content="Open Roblox login" Click="Login_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Open isolated account browser" Click="IsolatedBrowser_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                            <Button Content="Default browser login" Click="BrowserLogin_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                         </WrapPanel>
                                         <TextBlock Text="Place ID" Style="{StaticResource LabelTextStyle}"/>
                                         <TextBox x:Name="PlaceBox" ToolTip="Enter a Roblox place ID to open it" Margin="0,0,0,6"/>
                                         <Button Content="Open game in Roblox" HorizontalAlignment="Left" Click="Game_Click"/>
+                                        <TextBlock Text="Favorite game / account-specific Place ID" Style="{StaticResource LabelTextStyle}" Margin="0,13,0,6"/>
+                                        <TextBox x:Name="PreferredPlaceBox" ToolTip="Account's saved preferred Place ID"/>
+                                        <TextBlock Text="Preferred Job ID (optional)" Style="{StaticResource LabelTextStyle}"/>
+                                        <TextBox x:Name="PreferredJobBox" ToolTip="Optional server Job ID"/>
+                                        <Button Content="Launch preferred game" Click="OpenPreferred_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

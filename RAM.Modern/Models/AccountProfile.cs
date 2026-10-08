@@ -11,9 +11,14 @@ public sealed class AccountProfile
     public bool Favorite { get; set; }
     public DateTimeOffset AddedUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? LastSelectedUtc { get; set; }
+    public long PreferredPlaceId { get; set; }
+    public string PreferredJobId { get; set; } = "";
+    public string? AvatarUrl { get; set; }
+    public int SortOrder { get; set; }
 
     public string DisplayTitle => string.IsNullOrWhiteSpace(DisplayName) ? Username : DisplayName;
     public string Handle => string.IsNullOrWhiteSpace(Username) ? "@profile" : $"@{Username}";
+    public string GroupDisplay => RAM.Modern.Services.GroupSort.Parse(Group).DisplayName;
     public string UserIdLabel => UserId > 0 ? $"ID {UserId}" : "No ID";
     public string AddedLabel => AddedUtc.ToString("dd MMM yyyy");
 

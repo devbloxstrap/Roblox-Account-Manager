@@ -1,34 +1,20 @@
-# Roblox Account Manager
+# RAM Modern 4.0 - Consolidated Preview 6
 
-A modern Windows desktop application for managing Roblox account profiles, storing local profile metadata, and saving or restoring encrypted Roblox client session snapshots.
+A modern Windows 10/11 Roblox account/game manager using C# / WPF / .NET 10. This is an independent user-facing application maintained separately from the legacy RAM code.
 
-## Highlights
+## Quick start
 
-- Modern dark glass-style desktop UI
-- Custom app icon and branding assets
-- Resizable and maximizable custom window
-- Local account profiles with favorites, groups, notes, and search
-- Encrypted session snapshots for the current Windows user
-- Quick links for Roblox login, home, profile pages, and game launching
-- GitHub Actions workflow to build a Windows x64 executable
+1. Place `RAM.Modern`, `RAM.Modern.SmokeTests` and `.github/workflows` at the repository root.
+2. Commit to `main`; GitHub Actions runs the .NET 10 smoke harness, compiles and publishes `RAM.Modern.exe`.
+3. Download the `RAM-Modern-win-x64` build artifact and start `RAM.Modern.exe`.
+4. Follow **ONE_PASS_TESTING.md** for the single Windows acceptance test.
 
-## Build on GitHub
+## Included
 
-Push the repository to GitHub and open **Actions**.
-Run **Build RAM Modern** or trigger a push to `main`.
-After the workflow succeeds, download the **RAM-Modern-win-x64** artifact.
+Account profiles, encrypted local storage and metadata backups, identity-checked saved-session workflow (experimental), Roblox desktop launcher, multi-page public server browser and low-player scan, real Job ID shuffle, private server links, public player lookup, favorites/recents, game discovery, outfits and universe viewer, isolated Edge profiles/password manager, FPS presets and backup, theme presets, local developer API, watcher, safe diagnostics and a Windows smoke-test workflow.
 
-## Local storage
+## Limits
 
-Profile data is stored under:
+The app does **not** bypass Roblox login security or automate CAPTCHA solving; an encrypted session snapshot is not a guarantee the official Roblox desktop client will authenticate with it. Browser sessions and desktop sessions are separate. Client compatibility needs actual Windows testing. See **FEATURE_STATUS.md**.
 
-`%LOCALAPPDATA%\RAM.Modern`
-
-Session snapshots are stored in the same application folder and are protected with Windows DPAPI for the current user.
-
-## Important notes
-
-- Session restore is best effort only. Roblox may reject expired or revoked sessions.
-- Close Roblox Player and Roblox Studio completely before saving or restoring a session.
-- Do not share session files, cookies, or profile backups.
-- Test with secondary Roblox accounts first.
+Excluded by request: auto updater and multi-instance launching.

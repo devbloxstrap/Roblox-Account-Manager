@@ -14,6 +14,10 @@ public partial class MainWindow : Window
     private readonly List<AccountProfile> _profiles;
     private readonly ObservableCollection<AccountProfile> _displayed = new();
     private Guid? _selectedId;
+    private bool _sessionBusy;
+    private readonly AdvancedSettings _advancedSettings;
+    private readonly RobloxWatcher _watcher;
+    private readonly LocalDeveloperApi _localApi;
 
     public MainWindow()
     {
@@ -32,6 +36,28 @@ public partial class MainWindow : Window
         GroupBox.Text = "General";
         Refresh();
         UpdateWindowVisualState();
+        _ = LoadAvatarsAsync();
+        try { _advancedSettings = SettingsStore.Load(); }
+        catch (Exception ex)
+        {
+            _advancedSettings = new AdvancedSettings();
+            MessageBox.Show(ex.Message, "Advanced settings could not be loaded", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        ThemeManager.Apply(this, _advancedSettings);
+        _watcher = new RobloxWatcher(() => _advancedSettings);
+        _watcher.StatusChanged += status =>
+        {
+            if (_advancedSettings.WatcherNotifications)
+                Dispatcher.BeginInvoke(new Action(() => StatusText.Text = status));
+        };
+        _localApi = new LocalDeveloperApi(() => Dispatcher.Invoke(() => (IReadOnlyList<AccountProfile>)_profiles.ToArray()), () => RobloxService.RunningPlayerCount() > 0);
+        _localApi.StatusChanged += status => Dispatcher.BeginInvoke(new Action(() => StatusText.Text = status));
+        if (_advancedSettings.LocalApiEnabled)
+        {
+            try { _localApi.Start(_advancedSettings.LocalApiPort); }
+            catch (Exception ex) { StatusText.Text = "Local API not started: " + ex.Message; }
+        }
+        Closed += (_, _) => { _watcher.Dispose(); _localApi.Dispose(); };
     }
 
     private void Refresh()
@@ -47,10 +73,15 @@ public partial class MainWindow : Window
                     .Contains(q, StringComparison.OrdinalIgnoreCase));
         }
 
-        foreach (var p in query
-                     .OrderByDescending(p => p.Favorite)
-                     .ThenBy(p => p.Group)
-                     .ThenBy(p => string.IsNullOrWhiteSpace(p.DisplayName) ? p.Username : p.DisplayName))
+        int sortMode = SortBox?.SelectedIndex ?? 0;
+        query = sortMode switch
+        {
+            1 => query.OrderByDescending(p => p.LastSelectedUtc ?? DateTimeOffset.MinValue),
+            2 => query.OrderBy(p => p.Username, StringComparer.OrdinalIgnoreCase),
+            3 => query.OrderBy(p => p.SortOrder).ThenBy(p => p.Username),
+            _ => GroupSort.Sort(query)
+        };
+        foreach (var p in query)
         {
             _displayed.Add(p);
         }
@@ -92,6 +123,51 @@ public partial class MainWindow : Window
         SessionStateBadge.BorderBrush = hasSession ? new SolidColorBrush(Color.FromRgb(84, 209, 176)) : new SolidColorBrush(Color.FromRgb(74, 122, 188));
     }
 
+    private void Sort_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (AccountsList is not null) Refresh();
+    }
+
+    private void MoveUp_Click(object sender, RoutedEventArgs e) => MoveProfile(-1);
+    private void MoveDown_Click(object sender, RoutedEventArgs e) => MoveProfile(1);
+
+    private void MoveProfile(int offset)
+    {
+        if (_selectedId is null) return;
+        // Preserve the current displayed order when switching to manual mode.
+        var ordering = _displayed.ToList();
+        int index = ordering.FindIndex(p => p.Id == _selectedId);
+        int target = index + offset;
+        if (index < 0 || target < 0 || target >= ordering.Count) return;
+        (ordering[index], ordering[target]) = (ordering[target], ordering[index]);
+        for (int i = 0; i < ordering.Count; i++) ordering[i].SortOrder = i + 1;
+        ProfileStore.Save(_profiles);
+        SortBox.SelectedIndex = 3;
+        Refresh();
+    }
+
+    private async Task LoadAvatarsAsync()
+    {
+        try
+        {
+            var candidates = _profiles.Where(p => p.UserId > 0 && string.IsNullOrWhiteSpace(p.AvatarUrl)).Take(16).ToList();
+            if (candidates.Count == 0) return;
+            // Small bounded batches to reduce request pressure on public endpoints.
+            foreach (var batch in candidates.Chunk(4))
+            {
+                var imageUrls = await Task.WhenAll(batch.Select(async p => (p, url: await RobloxApi.GetAvatarAsync(p.UserId))));
+                foreach (var item in imageUrls)
+                    if (!string.IsNullOrWhiteSpace(item.url)) item.p.AvatarUrl = item.url;
+            }
+            if (candidates.Any(p => !string.IsNullOrWhiteSpace(p.AvatarUrl)))
+            {
+                ProfileStore.Save(_profiles);
+                Refresh();
+            }
+        }
+        catch { /* Public thumbnails are optional; missing network must not break the app. */ }
+    }
+
     private void Search_Changed(object sender, TextChangedEventArgs e)
     {
         if (AccountsList is not null)
@@ -114,6 +190,8 @@ public partial class MainWindow : Window
         GroupBox.Text = string.IsNullOrWhiteSpace(p.Group) ? "General" : p.Group;
         NoteBox.Text = p.Note;
         FavoriteBox.IsChecked = p.Favorite;
+        PreferredPlaceBox.Text = p.PreferredPlaceId > 0 ? p.PreferredPlaceId.ToString() : string.Empty;
+        PreferredJobBox.Text = p.PreferredJobId;
         UpdateSelectionSummary(p);
     }
 
@@ -149,6 +227,14 @@ public partial class MainWindow : Window
         profile.Group = string.IsNullOrWhiteSpace(GroupBox.Text) ? "General" : GroupBox.Text.Trim();
         profile.Note = NoteBox.Text.Trim();
         profile.Favorite = FavoriteBox.IsChecked == true;
+        if (!string.IsNullOrWhiteSpace(PreferredPlaceBox.Text) &&
+            (!long.TryParse(PreferredPlaceBox.Text, out long preferred) || preferred <= 0))
+        {
+            MessageBox.Show("Preferred Place ID must be a positive number.");
+            return;
+        }
+        profile.PreferredPlaceId = long.TryParse(PreferredPlaceBox.Text, out long gameId) ? gameId : 0;
+        profile.PreferredJobId = PreferredJobBox.Text.Trim();
 
         if (!_profiles.Any(x => x.Id == profile.Id))
             _profiles.Add(profile);
@@ -184,6 +270,8 @@ public partial class MainWindow : Window
         GroupBox.Text = "General";
         NoteBox.Clear();
         FavoriteBox.IsChecked = false;
+        PreferredPlaceBox.Clear();
+        PreferredJobBox.Clear();
     }
 
     private void Delete_Click(object sender, RoutedEventArgs e)
@@ -223,37 +311,173 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveSession_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    private async void VerifyClient_Click(object sender, RoutedEventArgs e)
     {
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId) ??
-                throw new InvalidOperationException("Select a profile first.");
+        if (_sessionBusy) return;
+        _sessionBusy = true;
+        try
+        {
+            StatusText.Text = "Verifying installed Roblox client account with Roblox…";
+            var actual = await RobloxSessionIdentity.CheckCurrentAsync();
+            if (actual is null)
+            {
+                StatusText.Text = "No valid desktop-client session was found. Sign in through Roblox desktop, close it, and retry.";
+                MessageBox.Show("No valid desktop Roblox login was found. Browser sign-in alone does NOT create a client session. Open Roblox desktop, log in, close all Roblox windows, then retry.",
+                    "Desktop client login not verified", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            StatusText.Text = $"Roblox verified @{actual.Name} (ID {actual.Id}).";
+            MessageBox.Show($"Desktop client authenticated as @{actual.Name}\nUser ID: {actual.Id}",
+                "Verified Roblox identity", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Identity verification", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
 
-        if (MessageBox.Show($"Save the current Roblox client login for @{p.Username}?\n\nMake sure the client is signed in with the same account. This action does not verify the username inside the login file.",
-                "Confirm session save", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-            return;
-
-        SessionSwitcher.SaveCurrent(p.Id);
-        SetSessionBadge(true);
-        StatusText.Text = $"Saved an encrypted session snapshot for @{p.Username}.";
-    });
-
-    private void RestoreSession_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    private async void SaveSession_Click(object sender, RoutedEventArgs e)
     {
-        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId) ??
-                throw new InvalidOperationException("Select a profile first.");
+        if (_sessionBusy) return;
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
+        if (p is null) { MessageBox.Show("Select and save an account profile first."); return; }
+        _sessionBusy = true;
+        try
+        {
+            StatusText.Text = $"Verifying desktop session before saving @{p.Username}…";
+            var actual = await RobloxSessionIdentity.CheckCurrentAsync();
+            if (actual is null)
+                throw new InvalidOperationException("No verifiable Roblox desktop login found. Sign in through Roblox desktop (not Chrome), close all Roblox windows, then retry.");
+            if (!p.Username.Equals(actual.Name, StringComparison.OrdinalIgnoreCase) || (p.UserId > 0 && actual.Id != p.UserId))
+                throw new InvalidOperationException($"Wrong account. Selected @{p.Username} but desktop Roblox is @{actual.Name} (ID {actual.Id}). No session saved.");
+            if (MessageBox.Show($"Roblox confirmed @{actual.Name} (ID {actual.Id}). Save this session encrypted for the current Windows user?",
+                    "Verified account", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            SessionSwitcher.SaveCurrent(p.Id);
+            p.UserId = actual.Id;
+            p.DisplayName = string.IsNullOrWhiteSpace(p.DisplayName) ? actual.DisplayName : p.DisplayName;
+            ProfileStore.Save(_profiles);
+            SetSessionBadge(true);
+            Refresh();
+            StatusText.Text = $"Verified and saved an encrypted session for @{actual.Name}.";
+            MessageBox.Show($"Session saved for @{actual.Name}. The account was verified by Roblox.",
+                "Saved successfully", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Save session failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
 
-        if (MessageBox.Show($"Restore the saved Roblox client session for @{p.Username}?\n\nAll Roblox windows must be closed. This replaces the local client login file and Roblox may still ask you to sign in again if the session is expired or revoked.",
-                "Confirm session restore", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-            return;
-
-        SessionSwitcher.Restore(p.Id);
+    private async Task<bool> RestoreVerifiedAsync(AccountProfile p)
+    {
+        if (MessageBox.Show($"Restore saved local session for @{p.Username}? Close Roblox Player and Studio first.",
+                "Restore session", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return false;
+        if (!SessionSwitcher.Restore(p.Id)) throw new IOException("Local restore verification failed; file was not restored correctly.");
+        StatusText.Text = "Local session restored. Checking with Roblox…";
+        var actual = await RobloxSessionIdentity.CheckCurrentAsync();
+        if (actual is null)
+        {
+            StatusText.Text = "Local file restored, but Roblox login was NOT verified. The session may have expired.";
+            MessageBox.Show("The local file was restored, but Roblox did not verify the login. The session may be expired, revoked, or unsupported. Re-login in the official desktop client.",
+                "Session not verified", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        if (!actual.Name.Equals(p.Username, StringComparison.OrdinalIgnoreCase) || (p.UserId > 0 && p.UserId != actual.Id))
+        {
+            StatusText.Text = "Restored file belongs to a different Roblox account. Do not launch it as the selected profile.";
+            MessageBox.Show($"Account mismatch! Selected @{p.Username}, but Roblox says @{actual.Name}. Login was not accepted for the selected profile.",
+                "Account mismatch", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
         p.LastSelectedUtc = DateTimeOffset.UtcNow;
         ProfileStore.Save(_profiles);
-        StatusText.Text = $"Restored the local client session for @{p.Username}. Open Roblox to verify it.";
         UpdateSelectionSummary(p);
+        StatusText.Text = $"Roblox API validated session for @{actual.Name}. Desktop application still needs a launch test.";
+        MessageBox.Show($"Roblox API verified @{actual.Name} (ID {actual.Id}). You can now launch the Roblox desktop client.",
+            "Session verified", MessageBoxButton.OK, MessageBoxImage.Information);
+        return true;
+    }
+
+    private async void RestoreSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sessionBusy) return;
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
+        if (p is null) { MessageBox.Show("Select a profile first."); return; }
+        _sessionBusy = true;
+        try { await RestoreVerifiedAsync(p); }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Restore failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
+
+    private void Login_Click(object sender, RoutedEventArgs e) => Safe(() => { StatusText.Text = RobloxService.LaunchDesktop(); });
+    private void IsolatedBrowser_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    {
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId) ?? throw new InvalidOperationException("Select an account first.");
+        RobloxService.OpenIsolatedAccountBrowser(p.Id);
+        StatusText.Text = $"Launched a separate Edge profile for @{p.Username}. Sign in in that browser once; it is not the Roblox desktop login.";
+    });
+    private void BrowserLogin_Click(object sender, RoutedEventArgs e) => Safe(RobloxService.BrowserLogin);
+    private async void RestoreAndLaunch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sessionBusy) return;
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
+        if (p is null) { MessageBox.Show("Select a profile first."); return; }
+        _sessionBusy = true;
+        try
+        {
+            if (!await RestoreVerifiedAsync(p)) return;
+            StatusText.Text = RobloxService.LaunchDesktop();
+        }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Restore / launch failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { _sessionBusy = false; }
+    }
+
+    private async void Lookup_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var username = UsernameBox.Text.Trim();
+            StatusText.Text = "Looking up public Roblox profile…";
+            var account = await RobloxApi.LookupUsernameAsync(username);
+            if (account is null) { MessageBox.Show("No exact Roblox username match found."); return; }
+            IdBox.Text = account.Id.ToString();
+            DisplayBox.Text = account.DisplayName;
+            StatusText.Text = $"Found verified public user @{account.Name} (ID {account.Id}). Click Save profile to keep it.";
+            var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
+            if (p is not null && p.Username.Equals(account.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                p.AvatarUrl = account.AvatarUrl;
+                ProfileStore.Save(_profiles);
+                Refresh();
+            }
+        }
+        catch (Exception ex) { StatusText.Text = ex.Message; MessageBox.Show(ex.Message, "Roblox lookup", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void AdvancedSettings_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    {
+        var dialog = new AdvancedWindow(_advancedSettings, _localApi, _watcher,
+            () => _profiles.FirstOrDefault(x => x.Id == _selectedId), _profiles, Refresh) { Owner = this };
+        dialog.ShowDialog();
+        StatusText.Text = "Advanced controls closed. Watcher: " + (_advancedSettings.WatcherEnabled ? "on" : "off") +
+                          "; local API: " + (_localApi.IsRunning ? "on" : "off") + ".";
     });
 
-    private void Login_Click(object sender, RoutedEventArgs e) => Safe(RobloxService.Login);
+    private void OpenTools_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    {
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId);
+        var window = new ToolsWindow(_profiles, Refresh, p?.PreferredPlaceId ?? 0) { Owner = this };
+        window.ShowDialog();
+        Refresh();
+    });
+
+    private void OpenPreferred_Click(object sender, RoutedEventArgs e) => Safe(() =>
+    {
+        var p = _profiles.FirstOrDefault(x => x.Id == _selectedId) ?? throw new InvalidOperationException("Select a saved profile.");
+        if (p.PreferredPlaceId <= 0) throw new InvalidOperationException("Save the profile with its preferred Place ID first.");
+        if (!string.IsNullOrWhiteSpace(p.PreferredJobId)) RobloxService.OpenServer(p.PreferredPlaceId, p.PreferredJobId);
+        else RobloxService.OpenGame(p.PreferredPlaceId);
+        var data = GameLibraryStore.Load();
+        GameLibraryStore.AddRecent(data, p.PreferredPlaceId);
+        StatusText.Text = $"Opened preferred game {p.PreferredPlaceId} for profile @{p.Username}; client authentication is not guaranteed.";
+    });
+
     private void Home_Click(object sender, RoutedEventArgs e) => Safe(RobloxService.Home);
 
     private void Profile_Click(object sender, RoutedEventArgs e) => Safe(() =>
@@ -268,6 +492,9 @@ public partial class MainWindow : Window
         if (!long.TryParse(PlaceBox.Text, out long place) || place <= 0)
             throw new InvalidOperationException("Enter a valid place ID first.");
         RobloxService.OpenGame(place);
+        var data = GameLibraryStore.Load();
+        GameLibraryStore.AddRecent(data, place);
+        StatusText.Text = $"Opened game {place} and saved it to recent games.";
     });
 
     private void Folder_Click(object sender, RoutedEventArgs e) => Safe(() =>
