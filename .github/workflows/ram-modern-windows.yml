@@ -3,9 +3,6 @@ name: Build RAM Modern
 on:
   push:
     branches: [main]
-    paths:
-      - 'RAM.Modern/**'
-      - '.github/workflows/ram-modern-windows.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,14 +14,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
       - name: Restore
         run: dotnet restore RAM.Modern/RAM.Modern.csproj -r win-x64
+
       - name: Publish Windows executable
         run: dotnet publish RAM.Modern/RAM.Modern.csproj -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o publish
+
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
