@@ -1,30 +1,450 @@
-<Window x:Class="RAM.Modern.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Roblox Account Manager 4.0 Preview" Width="1080" Height="710" MinWidth="830" MinHeight="550" Background="#101725" Foreground="#F0F3F8" WindowStartupLocation="CenterScreen">
-<Window.Resources>
- <Style TargetType="Button"><Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="0,0,9,0"/><Setter Property="Background" Value="#283956"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/></Style>
- <Style TargetType="TextBox"><Setter Property="Padding" Value="9"/><Setter Property="Background" Value="#202C40"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#465775"/><Setter Property="CaretBrush" Value="White"/></Style>
- <Style TargetType="TextBlock"><Setter Property="Margin" Value="0,0,0,5"/></Style>
-</Window.Resources>
-<Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
- <StackPanel Grid.Row="0" Margin="0,0,0,20"><TextBlock Text="ROBLOX ACCOUNT MANAGER" FontSize="24" FontWeight="Bold"/><TextBlock Text="4.0 Preview · Windows 10 / 11 · Account profiles and official Roblox login" Foreground="#9BAFCB"/></StackPanel>
- <DockPanel Grid.Row="1" Margin="0,0,0,15"><StackPanel Orientation="Horizontal" DockPanel.Dock="Right"><Button Content="Roblox login" Click="Login_Click"/><Button Content="Roblox home" Click="Home_Click"/><Button Content="Open data folder" Click="Folder_Click"/></StackPanel><TextBox x:Name="SearchBox" Width="280" TextChanged="Search_Changed" ToolTip="Search accounts by name, group, notes"/></DockPanel>
- <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
- <Border BorderBrush="#35445C" BorderThickness="1" CornerRadius="9" Padding="13" Margin="0,0,14,0"><DockPanel><TextBlock DockPanel.Dock="Top" Text="Saved accounts" FontWeight="Bold" FontSize="16" Margin="0,0,0,12"/><ListBox x:Name="AccountsList" SelectionChanged="Account_Selected" Background="Transparent" Foreground="White" BorderThickness="0" FontSize="14"/></DockPanel></Border>
- <Border Grid.Column="1" BorderBrush="#35445C" BorderThickness="1" CornerRadius="9" Padding="18"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
- <TextBlock Text="Account details" FontSize="17" FontWeight="Bold" Margin="0,0,0,14"/>
- <TextBlock Text="Username"/><TextBox x:Name="UsernameBox" Margin="0,0,0,13"/>
- <TextBlock Text="Display name"/><TextBox x:Name="DisplayBox" Margin="0,0,0,13"/>
- <TextBlock Text="Roblox user ID (optional)"/><TextBox x:Name="IdBox" Margin="0,0,0,13"/>
- <TextBlock Text="Group"/><TextBox x:Name="GroupBox" Text="General" Margin="0,0,0,13"/>
- <TextBlock Text="Notes"/><TextBox x:Name="NoteBox" Height="60" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,13"/>
- <CheckBox x:Name="FavoriteBox" Content="Favorite" Foreground="White" Margin="0,0,0,17"/>
- <WrapPanel Margin="0,0,0,16"><Button Content="Save account" Click="Save_Click"/><Button Content="New" Click="New_Click"/><Button Content="Delete" Click="Delete_Click"/></WrapPanel>
- <TextBlock Text="Session management (Windows user only)" FontWeight="Bold" Margin="0,0,0,10"/>
-<WrapPanel Margin="0,0,0,14"><Button Content="Save current session" Click="SaveSession_Click"/><Button Content="Restore selected session" Click="RestoreSession_Click"/></WrapPanel>
-<TextBlock Text="Close Roblox completely before saving/restoring. A restored session may be expired; use official login if requested." TextWrapping="Wrap" Foreground="#B9C6D8" Margin="0,0,0,16"/>
-<TextBlock Text="Open selected profile or a game" FontWeight="Bold" Margin="0,0,0,10"/>
- <WrapPanel Margin="0,0,0,9"><Button Content="View Roblox profile" Click="Profile_Click"/><Button Content="Open Roblox login" Click="Login_Click"/></WrapPanel>
- <TextBlock Text="Place ID"/><TextBox x:Name="PlaceBox" Margin="0,0,0,9"/><Button Content="Open game in Roblox" HorizontalAlignment="Left" Click="Game_Click"/>
- </StackPanel></ScrollViewer></Border>
- </Grid>
- <TextBlock Grid.Row="3" x:Name="StatusText" Foreground="#A8B7CA" Margin="0,14,0,0" Text="Stored sessions are encrypted for your Windows user. Roblox can revoke them; restore never bypasses login verification."/>
-</Grid></Window>
+<Window x:Class="RAM.Modern.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:local="clr-namespace:RAM.Modern"
+        Title="Roblox Account Manager"
+        Width="1360"
+        Height="860"
+        MinWidth="980"
+        MinHeight="680"
+        Background="#0B1120"
+        Foreground="#F6FAFF"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Icon="Assets/app-icon.png"
+        StateChanged="Window_StateChanged">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <LinearGradientBrush x:Key="AppBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#07101C" Offset="0"/>
+            <GradientStop Color="#0B1731" Offset="0.45"/>
+            <GradientStop Color="#101E39" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="PanelBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#16233A" Offset="0"/>
+            <GradientStop Color="#101C31" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ControlBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#1A2A46" Offset="0"/>
+            <GradientStop Color="#122038" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ButtonBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#3ED7FF" Offset="0"/>
+            <GradientStop Color="#3D7CFF" Offset="0.55"/>
+            <GradientStop Color="#9356FF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ButtonHoverBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#64E4FF" Offset="0"/>
+            <GradientStop Color="#5D96FF" Offset="0.55"/>
+            <GradientStop Color="#A676FF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="PanelShadow" BlurRadius="28" ShadowDepth="0" Color="#66000000" Opacity="0.45"/>
+        <DropShadowEffect x:Key="ButtonShadow" BlurRadius="18" ShadowDepth="0" Color="#902657FF" Opacity="0.35"/>
+
+        <Style x:Key="GlassPanelStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
+            <Setter Property="BorderBrush" Value="#314A70"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Effect" Value="{StaticResource PanelShadow}"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#D7E7FF"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F8FBFF"/>
+            <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
+            <Setter Property="BorderBrush" Value="#415E88"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#F8FBFF"/>
+            <Setter Property="Margin" Value="0,0,0,18"/>
+            <Setter Property="FontSize" Value="13.5"/>
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="16,11"/>
+            <Setter Property="Margin" Value="0,0,10,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{StaticResource ButtonBrush}"/>
+            <Setter Property="BorderBrush" Value="#7BCBFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Effect" Value="{StaticResource ButtonShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="buttonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="16" SnapsToDevicePixels="True">
+                            <Border Margin="1" CornerRadius="15" Background="#14FFFFFF">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="buttonBorder" Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="buttonBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.985" ScaleY="0.985"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#1D2E4D"/>
+            <Setter Property="BorderBrush" Value="#4F6E9D"/>
+            <Setter Property="Effect" Value="{StaticResource PanelShadow}"/>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#5A2133"/>
+            <Setter Property="BorderBrush" Value="#F08AA7"/>
+            <Setter Property="Effect" Value="{StaticResource PanelShadow}"/>
+        </Style>
+
+        <Style x:Key="WindowCommandButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Foreground" Value="#F6FAFF"/>
+            <Setter Property="Background" Value="#00000000"/>
+            <Setter Property="BorderBrush" Value="#00000000"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="cmdBorder" Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="cmdBorder" Property="Background" Value="#163F72"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="cmdBorder" Property="Background" Value="#21528F"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#F8FBFF"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="itemBorder" Padding="0" Background="#17253C" BorderBrush="#324B70" BorderThickness="1" CornerRadius="18">
+                            <ContentPresenter Margin="0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="#63D3FF"/>
+                                <Setter TargetName="itemBorder" Property="Background" Value="#1B2E4A"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="#79B8FF"/>
+                                <Setter TargetName="itemBorder" Property="Background" Value="#223557"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="46" ResizeBorderThickness="8" CornerRadius="18" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Border x:Name="RootBorder" Margin="8" CornerRadius="22" Background="{StaticResource AppBackgroundBrush}" BorderBrush="#2B4568" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- custom title bar -->
+            <Grid Grid.Row="0" x:Name="TitleBar" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#050A14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <Image Source="Assets/app-icon.png" Width="22" Height="22" Margin="0,0,10,0"/>
+                    <TextBlock Text="Roblox Account Manager" VerticalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="#EAF3FF"/>
+                    <Border Background="#162848" BorderBrush="#335D94" BorderThickness="1" CornerRadius="9" Padding="9,3" Margin="12,0,0,0">
+                        <TextBlock Text="4.0 Preview" FontSize="11" FontWeight="SemiBold" Foreground="#A6D8FF"/>
+                    </Border>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,7,8,7">
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Minimize_Click" Content="—" ToolTip="Minimize"/>
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="MaximizeRestore_Click" ToolTip="Maximize or restore">
+                        <TextBlock x:Name="MaximizeGlyph" Text="☐" FontSize="13"/>
+                    </Button>
+                    <Button Style="{StaticResource WindowCommandButtonStyle}" Click="Close_Click" ToolTip="Close">
+                        <TextBlock Text="✕" FontSize="13"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="22,20,22,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Hero / branding -->
+                <Border Grid.Row="0" Style="{StaticResource GlassPanelStyle}" Padding="22" Margin="0,0,0,18">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <Image Source="Assets/header-logo.png" Height="84" Stretch="Uniform" HorizontalAlignment="Left" Margin="0,0,0,14"/>
+                            <TextBlock Text="Professional account profiles, encrypted session snapshots, and a modern Windows desktop experience." FontSize="15" Foreground="#D8E5FF" Margin="0,0,0,8"/>
+                            <TextBlock Text="Resizable • Maximizable • Local profile storage • Windows 10 / 11" FontSize="12.5" Foreground="#90B3DE"/>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="20,0,0,0">
+                            <Button Content="Roblox login" Click="Login_Click"/>
+                            <Button Content="Roblox home" Click="Home_Click"/>
+                            <Button Content="Open data folder" Click="Folder_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Search / quick strip -->
+                <Grid Grid.Row="1" Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Search saved accounts" Style="{StaticResource LabelTextStyle}"/>
+                        <TextBox x:Name="SearchBox" Width="340" TextChanged="Search_Changed" ToolTip="Search by username, display name, group, note, or user ID" Margin="0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                        <Border Background="#16284A" BorderBrush="#3A659B" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                            <TextBlock x:Name="TopSummaryText" Text="0 profiles stored locally" Foreground="#D8E7FF" FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Main content -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.12*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- left accounts -->
+                    <Border Grid.Column="0" Style="{StaticResource GlassPanelStyle}" Padding="18">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Saved accounts" FontSize="19" FontWeight="Bold"/>
+                                    <TextBlock Text="Select a profile to edit details, save a session, or restore a stored session." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,0"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="New profile" Click="New_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="16,0,0,0" VerticalAlignment="Top"/>
+                            </Grid>
+                            <Grid Grid.Row="1" Margin="0,18,0,0">
+                                <ListBox x:Name="AccountsList" SelectionChanged="Account_Selected">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="54" Height="54" CornerRadius="14" Background="#20406E" BorderBrush="#5D93D8" BorderThickness="1" Margin="14,14,12,14">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="👤" FontSize="24"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="0,14,8,14">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="★" Foreground="#FFD86B" FontSize="14" FontWeight="Bold" Margin="0,0,6,0" Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}"/>
+                                                        <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold" Foreground="#F7FBFF"/>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Handle}" FontSize="12.5" Foreground="#A6C1E5" Margin="0,4,0,0"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                        <Border Background="#12284A" BorderBrush="#365B8E" BorderThickness="1" CornerRadius="10" Padding="8,3" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding Group}" FontSize="11.5" Foreground="#D6E8FF"/>
+                                                        </Border>
+                                                        <Border Background="#1D3154" BorderBrush="#477AB8" BorderThickness="1" CornerRadius="10" Padding="8,3">
+                                                            <TextBlock Text="{Binding UserIdLabel}" FontSize="11.5" Foreground="#D6E8FF"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Note}" FontSize="11.5" Foreground="#88A7D0" Margin="0,8,0,0" MaxHeight="32" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                    <TextBlock Text="{Binding AddedLabel}" FontSize="11" Foreground="#7F9FC8" HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <Border x:Name="EmptyAccountsState" Background="#0C1425" BorderBrush="#30486C" BorderThickness="1" CornerRadius="18" Visibility="Collapsed">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30">
+                                        <TextBlock Text="🗂" FontSize="46" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="No profiles yet" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,12,0,6"/>
+                                        <TextBlock Text="Create a new profile, then save the current Roblox session after logging in with that account." FontSize="13" Foreground="#A4BEDF" TextAlignment="Center" MaxWidth="360"/>
+                                        <Button Content="Create first profile" Click="New_Click" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <GridSplitter Grid.Column="1" Width="14" Background="Transparent" HorizontalAlignment="Stretch"/>
+
+                    <!-- right details -->
+                    <Border Grid.Column="2" Style="{StaticResource GlassPanelStyle}" Padding="18">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="Profile details" FontSize="19" FontWeight="Bold"/>
+                                <TextBlock Text="Manage account metadata, session snapshots, and quick Roblox actions." FontSize="12.5" Foreground="#9AB5D8" Margin="0,6,0,18"/>
+
+                                <Border Background="#132442" BorderBrush="#365B8E" BorderThickness="1" CornerRadius="16" Padding="14" Margin="0,0,0,18">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock x:Name="SelectedTitleText" Text="No profile selected" FontSize="16" FontWeight="Bold"/>
+                                            <TextBlock x:Name="SelectedSubtitleText" Text="Create or select a profile to begin." FontSize="12.5" Foreground="#A8C3E5" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" x:Name="SessionStateBadge" Background="#183257" BorderBrush="#4A7ABC" BorderThickness="1" CornerRadius="12" Padding="10,6" Margin="14,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SessionStateText" Text="No saved session" FontSize="11.5" Foreground="#DCEBFF" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Text="Username" Style="{StaticResource LabelTextStyle}"/>
+                                <TextBox x:Name="UsernameBox" ToolTip="Roblox username"/>
+
+                                <TextBlock Text="Display name" Style="{StaticResource LabelTextStyle}"/>
+                                <TextBox x:Name="DisplayBox" ToolTip="Friendly display name shown in the app"/>
+
+                                <TextBlock Text="Roblox user ID (optional)" Style="{StaticResource LabelTextStyle}"/>
+                                <TextBox x:Name="IdBox" ToolTip="Numeric Roblox user ID"/>
+
+                                <TextBlock Text="Group" Style="{StaticResource LabelTextStyle}"/>
+                                <TextBox x:Name="GroupBox" ToolTip="Organization label, such as Main, Alts, Storage, Test"/>
+
+                                <TextBlock Text="Notes" Style="{StaticResource LabelTextStyle}"/>
+                                <TextBox x:Name="NoteBox" Height="82" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Any reminders or notes for this account"/>
+
+                                <CheckBox x:Name="FavoriteBox" Content="Mark as favorite"/>
+
+                                <WrapPanel Margin="0,0,0,14">
+                                    <Button Content="Save profile" Click="Save_Click"/>
+                                    <Button Content="New" Click="New_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                    <Button Content="Delete" Click="Delete_Click" Style="{StaticResource DangerButtonStyle}"/>
+                                </WrapPanel>
+
+                                <Border Background="#101D32" BorderBrush="#2F4568" BorderThickness="1" CornerRadius="18" Padding="16" Margin="0,4,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Session management" FontSize="16" FontWeight="Bold"/>
+                                        <TextBlock Text="Save or restore encrypted Windows-user-specific snapshots of the local Roblox client session file." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
+                                        <WrapPanel>
+                                            <Button Content="Save current session" Click="SaveSession_Click"/>
+                                            <Button Content="Restore selected session" Click="RestoreSession_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="Important: close Roblox Player and Roblox Studio completely before saving or restoring. A restored session can still be expired or rejected by Roblox." FontSize="11.5" Foreground="#8FB0DA" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#101D32" BorderBrush="#2F4568" BorderThickness="1" CornerRadius="18" Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="Quick actions" FontSize="16" FontWeight="Bold"/>
+                                        <TextBlock Text="Open the selected profile or launch a game through the official Roblox website flow." FontSize="12.5" Foreground="#A2BADA" Margin="0,6,0,12"/>
+                                        <WrapPanel>
+                                            <Button Content="View Roblox profile" Click="Profile_Click"/>
+                                            <Button Content="Open Roblox login" Click="Login_Click" Style="{StaticResource SecondaryButtonStyle}"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="Place ID" Style="{StaticResource LabelTextStyle}"/>
+                                        <TextBox x:Name="PlaceBox" ToolTip="Enter a Roblox place ID to open it" Margin="0,0,0,6"/>
+                                        <Button Content="Open game in Roblox" HorizontalAlignment="Left" Click="Game_Click"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Row="2" Margin="22,0,22,22" Background="#0D1728" BorderBrush="#274367" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                <TextBlock x:Name="StatusText" Foreground="#D7E5F9" Text="Ready. Saved sessions are encrypted for the current Windows user. Roblox may still require re-login."/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
