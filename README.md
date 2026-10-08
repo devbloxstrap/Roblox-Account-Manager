@@ -1,36 +1,34 @@
 # Roblox Account Manager
 
-A modern, open-source Windows desktop application for organizing Roblox accounts with a clean desktop interface.
+A modern Windows desktop application for managing Roblox account profiles, storing local profile metadata, and saving or restoring encrypted Roblox client session snapshots.
 
-## Features
+## Highlights
 
-- Profiles, groups, favorites, notes and account search
-- Dark-themed WPF desktop interface with C# and .NET 10
-- Locally saved profile data and backups
-- Official Roblox login and profile links
-- Experimental DPAPI-protected local session snapshots and restoration
-- Windows 10 / Windows 11 x64 target
+- Modern dark glass-style desktop UI
+- Custom app icon and branding assets
+- Resizable and maximizable custom window
+- Local account profiles with favorites, groups, notes, and search
+- Encrypted session snapshots for the current Windows user
+- Quick links for Roblox login, home, profile pages, and game launching
+- GitHub Actions workflow to build a Windows x64 executable
 
-**Session restore is experimental.** Roblox may reject restored sessions or alter its local session format. Expired sessions require signing in again. Multi-instance launching is not included.
+## Build on GitHub
 
-## Build and download
+Push the repository to GitHub and open **Actions**.
+Run **Build RAM Modern** or trigger a push to `main`.
+After the workflow succeeds, download the **RAM-Modern-win-x64** artifact.
 
-Open [Build RAM Modern](https://github.com/devbloxstrap/Roblox-Account-Manager/actions/workflows/ram-modern-windows.yml) under GitHub Actions, select **Run workflow**, then download the `RAM-Modern-win-x64` artifact from the completed run. Extract before running `RAM.Modern.exe`.
+## Local storage
 
-Local build (Windows with .NET 10 SDK):
+Profile data is stored under:
 
-```powershell
-dotnet publish RAM.Modern/RAM.Modern.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o publish
-```
+`%LOCALAPPDATA%\RAM.Modern`
 
-## Testing
+Session snapshots are stored in the same application folder and are protected with Windows DPAPI for the current user.
 
-This is a preview and has not yet completed Windows runtime and current Roblox authentication testing. See [Session Testing](RAM.Modern/SESSION_TESTING.md).
+## Important notes
 
-## Security
-
-Never upload Roblox cookies, login files, or account backups. Test using secondary accounts.
-
-## Licensing
-
-This repository includes existing GPL-licensed source and other third-party components. Preserve original license and copyright notices and review redistribution obligations before publishing binaries.
+- Session restore is best effort only. Roblox may reject expired or revoked sessions.
+- Close Roblox Player and Roblox Studio completely before saving or restoring a session.
+- Do not share session files, cookies, or profile backups.
+- Test with secondary Roblox accounts first.
