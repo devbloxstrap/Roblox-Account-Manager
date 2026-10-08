@@ -13,18 +13,33 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore
+      - name: Static source validation
+        run: python verify_source.py
+
+      - name: Restore smoke tests
+        run: dotnet restore RAM.Modern.SmokeTests/RAM.Modern.SmokeTests.csproj
+
+      - name: Compile and run smoke tests
+        run: dotnet run --project RAM.Modern.SmokeTests/RAM.Modern.SmokeTests.csproj -c Release --no-restore
+
+      - name: Restore Windows release
         run: dotnet restore RAM.Modern/RAM.Modern.csproj -r win-x64
 
       - name: Publish Windows executable
         run: dotnet publish RAM.Modern/RAM.Modern.csproj -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o publish
+
+      - name: Verify published executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "publish/RAM.Modern.exe")) { throw "RAM.Modern.exe not found in publish output" }
+          Write-Output "Published RAM.Modern.exe exists"
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
